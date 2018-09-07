@@ -24,9 +24,7 @@ function validateProps(props) {
   if (keys.length !== 0) {
     throw new Error(
       'This navigator has both navigation and container props, so it is ' +
-        `unclear if it should own its own state. Remove props: "${keys.join(
-          ', '
-        )}" ` +
+        `unclear if it should own its own state. Remove props: "${keys.join(', ')}" ` +
         'if the navigator should get its state from the navigation prop. If the ' +
         'navigator should maintain its own state, do not pass a navigation prop.'
     );
@@ -92,16 +90,12 @@ export default function createNavigationContainer(Component) {
 
       this.state = {
         nav:
-          this._isStateful() && !props.persistenceKey
-            ? Component.router.getStateForAction(this._initialAction)
-            : null,
+          this._isStateful() && !props.persistenceKey ? Component.router.getStateForAction(this._initialAction) : null,
       };
     }
 
     _renderLoading() {
-      return this.props.renderLoadingExperimental
-        ? this.props.renderLoadingExperimental()
-        : null;
+      return this.props.renderLoadingExperimental ? this.props.renderLoadingExperimental() : null;
     }
 
     _isStateful() {
@@ -120,9 +114,7 @@ export default function createNavigationContainer(Component) {
       if (keys.length !== 0) {
         throw new Error(
           'This navigator has both navigation and container props, so it is ' +
-            `unclear if it should own its own state. Remove props: "${keys.join(
-              ', '
-            )}" ` +
+            `unclear if it should own its own state. Remove props: "${keys.join(', ')}" ` +
             'if the navigator should get its state from the navigation prop. If the ' +
             'navigator should maintain its own state, do not pass a navigation prop.'
         );
@@ -130,11 +122,7 @@ export default function createNavigationContainer(Component) {
     }
 
     _handleOpenURL = ({ url }) => {
-      const { enableURLHandling, uriPrefix } = this.props;
-      if (enableURLHandling === false) {
-        return;
-      }
-      const parsedUrl = urlToPathAndParams(url, uriPrefix);
+      const parsedUrl = urlToPathAndParams(url, this.props.uriPrefix);
       if (parsedUrl) {
         const { path, params } = parsedUrl;
         const action = Component.router.getActionForPathAndParams(path, params);
@@ -203,15 +191,10 @@ export default function createNavigationContainer(Component) {
       Linking.addEventListener('url', this._handleOpenURL);
 
       // Pull out anything that can impact state
-      const { persistenceKey, uriPrefix, enableURLHandling } = this.props;
-      let parsedUrl = null;
-      let startupStateJSON = null;
-      if (enableURLHandling !== false) {
-        startupStateJSON =
-          persistenceKey && (await AsyncStorage.getItem(persistenceKey));
-        const url = await Linking.getInitialURL();
-        parsedUrl = url && urlToPathAndParams(url, uriPrefix);
-      }
+      const { persistenceKey, uriPrefix } = this.props;
+      const startupStateJSON = persistenceKey && (await AsyncStorage.getItem(persistenceKey));
+      const url = await Linking.getInitialURL();
+      const parsedUrl = url && urlToPathAndParams(url, uriPrefix);
 
       // Initialize state. This must be done *after* any async code
       // so we don't end up with a different value for this.state.nav
@@ -219,9 +202,8 @@ export default function createNavigationContainer(Component) {
       let action = this._initialAction;
       let startupState = this.state.nav;
       if (!startupState) {
-        !!process.env.REACT_NAV_LOGGING &&
-          console.log('Init new Navigation State');
-        startupState = Component.router.getStateForAction(action);
+        !!process.env.REACT_NAV_LOGGING && console.log('Init new Navigation State');
+        // startupState = Component.router.getStateForAction(action);
       }
 
       // Pull persisted state from AsyncStorage
@@ -235,18 +217,11 @@ export default function createNavigationContainer(Component) {
       // Pull state out of URL
       if (parsedUrl) {
         const { path, params } = parsedUrl;
-        const urlAction = Component.router.getActionForPathAndParams(
-          path,
-          params
-        );
+        const urlAction = Component.router.getActionForPathAndParams(path, params);
         if (urlAction) {
-          !!process.env.REACT_NAV_LOGGING &&
-            console.log('Applying Navigation Action for Initial URL:', url);
+          !!process.env.REACT_NAV_LOGGING && console.log('Applying Navigation Action for Initial URL:', url);
           action = urlAction;
-          startupState = Component.router.getStateForAction(
-            urlAction,
-            startupState
-          );
+          startupState = Component.router.getStateForAction(urlAction, startupState);
         }
       }
 
@@ -259,7 +234,7 @@ export default function createNavigationContainer(Component) {
             lastState: null,
           })
         );
-
+      this._navState = startupState;
       if (startupState === this.state.nav) {
         dispatchActions();
         return;
@@ -312,10 +287,7 @@ export default function createNavigationContainer(Component) {
       this._navState = this._navState || this.state.nav;
       const lastNavState = this._navState;
       invariant(lastNavState, 'should be set in constructor if stateful');
-      const reducedState = Component.router.getStateForAction(
-        action,
-        lastNavState
-      );
+      const reducedState = Component.router.getStateForAction(action, lastNavState);
       const navState = reducedState === null ? lastNavState : reducedState;
 
       const dispatchActionEvents = () => {
@@ -356,7 +328,7 @@ export default function createNavigationContainer(Component) {
     render() {
       let navigation = this.props.navigation;
       if (this._isStateful()) {
-        const navState = this.state.nav;
+        const navState = this._navState || this.state.nav;
         if (!navState) {
           return this._renderLoading();
         }
